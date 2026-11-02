@@ -1,0 +1,57 @@
+# Режим https. ${MAIN_DOMAIN} и ${PARTNERS_DOMAIN} подставляются из env при старте.
+# Сертификаты: /etc/letsencrypt/live/<домен>/{fullchain,privkey}.pem (папка certs/ проекта).
+
+# ---------- редирект http → https ----------
+server {
+  listen 80;
+  server_name ${MAIN_DOMAIN} www.${MAIN_DOMAIN} ${PARTNERS_DOMAIN};
+
+  include /etc/nginx/snippets/acme.conf;
+  location / { return 301 https://$host$request_uri; }
+}
+
+# ---------- основной сайт ----------
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name www.${MAIN_DOMAIN};
+
+  ssl_certificate     /etc/letsencrypt/live/${MAIN_DOMAIN}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${MAIN_DOMAIN}/privkey.pem;
+  include /etc/nginx/snippets/ssl.conf;
+
+  return 301 https://${MAIN_DOMAIN}$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name ${MAIN_DOMAIN};
+
+  ssl_certificate     /etc/letsencrypt/live/${MAIN_DOMAIN}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${MAIN_DOMAIN}/privkey.pem;
+  include /etc/nginx/snippets/ssl.conf;
+
+  location / {
+    set $upstream http://front:80;
+    include /etc/nginx/snippets/proxy.conf;
+    proxy_pass $upstream;
+  }
+}
+
+# ---------- кабинет партнёров ----------
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name ${PARTNERS_DOMAIN};
+
+  ssl_certificate     /etc/letsencrypt/live/${PARTNERS_DOMAIN}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${PARTNERS_DOMAIN}/privkey.pem;
+  include /etc/nginx/snippets/ssl.conf;
+
+  location / {
+    set $upstream http://partners:80;
+    include /etc/nginx/snippets/proxy.conf;
+    proxy_pass $upstream;
+  }
+}

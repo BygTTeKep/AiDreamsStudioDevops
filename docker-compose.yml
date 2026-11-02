@@ -1,0 +1,53 @@
+# Общий nginx на 80/443: по домену проксирует в контейнеры подпроектов по сети aidreams.
+#   MAIN_DOMAIN     → front:80    (AiDreamsStudioFront)
+#   PARTNERS_DOMAIN → partners:80 (AiDreamsStudioPartners)
+# /api проксируют на бэкенд сами фронты, их nginx остаётся как есть.
+#
+# Порядок запуска: AiDreamsStudio (--profile app) → фронты → этот файл.
+# Сеть aidreams создаёт бэкенд; если его ещё нет: docker network create aidreams
+#
+#   docker compose up -d                          — nginx
+#   docker compose --profile certbot run --rm certbot certonly ...  — выпуск сертификата (см. README)
+#   docker compose --profile certbot up -d        — nginx + автопродление сертификатов
+name: aidreamsstudio-devops
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MAIN_DOMAIN: ${MAIN_DOMAIN:-aidreamsstudio.ru}
+      PARTNERS_DOMAIN: ${PARTNERS_DOMAIN:-partners.aidreamsstudio.ru}
+    volumes:
+      # *.conf.template → /etc/nginx/conf.d/*.conf через envsubst при старте контейнера;
+      # NGINX_MODE=http — без TLS (сейчас), https — когда появятся сертификаты
+      - ./nginx/${NGINX_MODE:-http}:/etc/nginx/templates:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./certs:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    # раз в 6 ч перечитывает конфиг — подхватывает продлённые сертификаты
+    command: ["/bin/sh", "-c", "while :; do sleep 6h; nginx -s reload; done & exec nginx -g 'daemon off;'"]
+    networks: [aidreams]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  certbot:
+    profiles: [certbot]
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - ./certs:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    # по умолчанию — продление раз в 12 ч; для выпуска команда передаётся через run (см. README)
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
+
+networks:
+  aidreams:
+    external: true

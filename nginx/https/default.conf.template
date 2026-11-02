@@ -1,0 +1,27 @@
+# Режим https. Файл перекрывает default.conf образа nginx.
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      close;
+}
+
+# фото товара: до 10 файлов по 10 МБ — как в nginx фронтов
+client_max_body_size 110m;
+server_tokens off;
+
+# :80 — ACME-проверка и редирект на https для известных доменов, остальное закрыть
+server {
+  listen 80 default_server;
+  server_name _;
+
+  include /etc/nginx/snippets/acme.conf;
+  location = /healthz { access_log off; return 200 "ok\n"; }
+  location / { return 444; }
+}
+
+# :443 для неизвестных хостов — отбить TLS-рукопожатие, не показывая сертификат
+server {
+  listen 443 ssl default_server;
+  http2 on;
+  server_name _;
+  ssl_reject_handshake on;
+}
