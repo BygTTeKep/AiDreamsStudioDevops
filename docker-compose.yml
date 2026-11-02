@@ -28,8 +28,9 @@ services:
       - ./nginx/snippets:/etc/nginx/snippets:ro
       - ./certs:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
-    # раз в 6 ч перечитывает конфиг — подхватывает продлённые сертификаты
-    command: ["/bin/sh", "-c", "while :; do sleep 6h; nginx -s reload; done & exec nginx -g 'daemon off;'"]
+      # раз в 6 ч перечитывает конфиг — подхватывает продлённые сертификаты. Не через command:
+      # entrypoint образа подставляет шаблоны, только если команда — nginx (она по умолчанию)
+      - ./nginx/entrypoint.d/40-reload-certs.sh:/docker-entrypoint.d/40-reload-certs.sh:ro
     networks: [aidreams]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
