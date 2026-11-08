@@ -6,6 +6,7 @@
 |-------------------------------------|---------------|------------------------|
 | `MAIN_DOMAIN`, `www.MAIN_DOMAIN`    | `front:80`    | AiDreamsStudioFront    |
 | `PARTNERS_DOMAIN`                   | `partners:80` | AiDreamsStudioPartners |
+| `ADMIN_DOMAIN`                      | `admin:80`    | AiDreamsStudioAdmin    |
 
 `/api` и WebSocket проксируют на бэкенд (`backend:3000`) сами фронты, у каждого свой nginx внутри контейнера. Запросы к неизвестным хостам и по IP отбрасываются.
 
@@ -20,7 +21,7 @@ certs/                      /etc/letsencrypt (в git не попадает)
 certbot/www/                webroot для ACME-проверки
 ```
 
-Шаблоны превращаются в `conf.d/*.conf` при старте контейнера: `${MAIN_DOMAIN}` и `${PARTNERS_DOMAIN}` подставляются из env.
+Шаблоны превращаются в `conf.d/*.conf` при старте контейнера: `${MAIN_DOMAIN}`, `${PARTNERS_DOMAIN}` и `${ADMIN_DOMAIN}` подставляются из env.
 
 ## Запуск
 
@@ -31,6 +32,7 @@ cp .env.example .env        # домены и NGINX_MODE
 (cd ../AiDreamsStudio         && docker compose --profile app up -d --build)
 (cd ../AiDreamsStudioFront    && docker compose up -d --build)
 (cd ../AiDreamsStudioPartners && docker compose up -d --build)
+(cd ../AiDreamsStudioAdmin    && docker compose up -d --build)
 docker compose up -d
 ```
 
@@ -42,7 +44,7 @@ docker compose up -d
 
 DNS-записи доменов должны указывать на сервер, nginx запущен в режиме `http`: он уже отдаёт `/.well-known/acme-challenge/`.
 
-Сертификатов два, по одному на домен: `nginx/https` ждёт их в `certs/live/<MAIN_DOMAIN>/` и `certs/live/<PARTNERS_DOMAIN>/`. Папка называется по первому `-d`. Подставьте свои домены и почту (на неё Let's Encrypt пишет об истекающих сертификатах):
+Сертификатов три, по одному на домен: `nginx/https` ждёт их в `certs/live/<MAIN_DOMAIN>/`, `certs/live/<PARTNERS_DOMAIN>/` и `certs/live/<ADMIN_DOMAIN>/`. Если хоть одного файла нет, nginx в режиме `https` не стартует и ложатся все сайты: новый домен сначала выпускайте в режиме `http` (или при уже работающем `https` — certbot отвечает через тот же webroot), и только потом пересоздавайте nginx. Папка называется по первому `-d`. Подставьте свои домены и почту (на неё Let's Encrypt пишет об истекающих сертификатах):
 
 ```bash
 # основной домен + www — один сертификат на оба имени
@@ -52,6 +54,10 @@ docker compose --profile certbot run --rm certbot \
 # кабинет партнёров
 docker compose --profile certbot run --rm certbot \
   "certbot certonly --webroot -w /var/www/certbot --agree-tos --no-eff-email -m you@example.com -d partners.aidreamsstudio.ru"
+
+# админка
+docker compose --profile certbot run --rm certbot \
+  "certbot certonly --webroot -w /var/www/certbot --agree-tos --no-eff-email -m you@example.com -d admin.aidreamsstudio.ru"
 ```
 
 `run --rm` создаёт одноразовый контейнер certbot: он выпускает сертификат в `certs/` и удаляется. Для проверки без лимитов Let's Encrypt добавьте `--dry-run`.
