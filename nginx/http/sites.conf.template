@@ -1,4 +1,4 @@
-# Режим http. ${MAIN_DOMAIN} и ${PARTNERS_DOMAIN} подставляются из env при старте.
+# Режим http. ${MAIN_DOMAIN}, ${PARTNERS_DOMAIN} и ${ADMIN_DOMAIN} подставляются из env при старте.
 
 server {
   listen 80;
@@ -21,6 +21,19 @@ server {
 
   location / {
     set $upstream http://partners:80;
+    include /etc/nginx/snippets/proxy.conf;
+    proxy_pass $upstream;
+  }
+}
+
+server {
+  listen 80;
+  server_name ${ADMIN_DOMAIN};
+
+  include /etc/nginx/snippets/acme.conf;
+
+  location / {
+    set $upstream http://admin:80;
     include /etc/nginx/snippets/proxy.conf;
     proxy_pass $upstream;
   }

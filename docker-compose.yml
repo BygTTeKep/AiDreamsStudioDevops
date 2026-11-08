@@ -1,6 +1,7 @@
 # Общий nginx на 80/443: по домену проксирует в контейнеры подпроектов по сети aidreams.
 #   MAIN_DOMAIN     → front:80    (AiDreamsStudioFront)
 #   PARTNERS_DOMAIN → partners:80 (AiDreamsStudioPartners)
+#   ADMIN_DOMAIN    → admin:80    (AiDreamsStudioAdmin)
 # /api проксируют на бэкенд сами фронты, их nginx остаётся как есть.
 #
 # Порядок запуска: AiDreamsStudio (--profile app) → фронты → этот файл.
@@ -21,6 +22,7 @@ services:
     environment:
       MAIN_DOMAIN: ${MAIN_DOMAIN:-aidreamsstudio.ru}
       PARTNERS_DOMAIN: ${PARTNERS_DOMAIN:-partners.aidreamsstudio.ru}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-admin.aidreamsstudio.ru}
     volumes:
       # *.conf.template → /etc/nginx/conf.d/*.conf через envsubst при старте контейнера;
       # NGINX_MODE=http — без TLS (сейчас), https — когда появятся сертификаты
